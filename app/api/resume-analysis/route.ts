@@ -127,11 +127,9 @@ async function extractTextFromFile(file: File): Promise<string> {
   if (fileType === 'application/pdf') {
     // PDF extraction using pdf-parse
     try {
-      const pdfParse = await import('pdf-parse');
+      const pdfParse = (await import('pdf-parse')) as unknown as (buffer: Buffer) => Promise<{ text: string }>;
       const buffer = Buffer.from(await file.arrayBuffer());
-      // Handle both ESM and CJS exports
-      const parseFn = typeof pdfParse === 'function' ? pdfParse : (pdfParse.default || pdfParse);
-      const pdfData = await (parseFn as (buffer: Buffer) => Promise<{ text: string }>)(buffer);
+      const pdfData = await pdfParse(buffer);
       return pdfData.text;
     } catch (error) {
       console.error('PDF parsing error:', error);

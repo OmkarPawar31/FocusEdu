@@ -1,87 +1,67 @@
 // Vector Store for Resume Analysis RAG System
-// Uses Chroma DB with HuggingFace Embeddings
+// Uses in-memory search for Vercel serverless compatibility
 
-import { ChromaClient, Collection } from 'chromadb';
 import { resumeKnowledgeBase } from './knowledgeBase';
 
-// Initialize Chroma client (runs embedded/in-memory by default)
-const chromaClient = new ChromaClient();
+// Simple in-memory vector store for serverless environments
+// Note: ChromaDB doesn't work well in serverless due to persistence requirements
 
-let collection: Collection | null = null;
-let initialized = false;
+interface SearchResult {
+  content: string;
+  score: number;
+  category: string;
+}
 
-// Initialize the vector store with knowledge base
-export async function initializeVectorStore(): Promise<Collection> {
-  if (initialized && collection) {
-    return collection;
-  }
-
-  try {
-    // Delete existing collection if it exists (for fresh start)
-    try {
-      await chromaClient.deleteCollection({ name: 'resume_knowledge' });
-    } catch {
-      // Collection doesn't exist, that's fine
-    }
-
-    // Create new collection with default embedding function
-    collection = await chromaClient.createCollection({
-      name: 'resume_knowledge',
-      metadata: { description: 'Resume analysis knowledge base' },
+// TF-IDF based similarity search (works in serverless)
+function computeTFIDF(text: string, documents: string[]): number[] {
+  const words = text.toLowerCase().split(/\W+/).filter(w => w.length > 2);
+  const wordSet = new Set(words);
+  
+  // Calculate document frequencies
+  const df: Record<string, number> = {};
+  documents.forEach(doc => {
+    const docWords = new Set(doc.toLowerCase().split(/\W+/).filter(w => w.length > 2));
+    docWords.forEach(word => {
+      df[word] = (df[word] || 0) + 1;
     });
-
-    // Prepare documents for insertion
-    const documents: string[] = [];
-    const ids: string[] = [];
-    const metadatas: { category: string; keywords: string }[] = [];
-
-    resumeKnowledgeBase.forEach((item) => {
-      documents.push(item.content);
-      ids.push(item.id);
-      metadatas.push({
-        category: item.category,
-        keywords: item.keywords.join(','),
-      });
+  });
+  
+  // Calculate TF-IDF scores for each document
+  return documents.map(doc => {
+    const docWords = doc.toLowerCase().split(/\W+/).filter(w => w.length > 2);
+    const docWordCounts: Record<string, number> = {};
+    docWords.forEach(w => { docWordCounts[w] = (docWordCounts[w] || 0) + 1; });
+    
+    let score = 0;
+    wordSet.forEach(word => {
+      if (docWordCounts[word]) {
+        const tf = docWordCounts[word] / docWords.length;
+        const idf = Math.log(documents.length / (df[word] || 1));
+        score += tf * idf;
+      }
     });
-
-    // Add documents to collection (Chroma will auto-generate embeddings)
-    await collection.add({
-      ids,
-      documents,
-      metadatas,
-    });
-
-    initialized = true;
-    console.log(`Chroma vector store initialized with ${documents.length} documents`);
-
-    return collection;
-  } catch (error) {
-    console.error('Failed to initialize Chroma:', error);
-    throw error;
-  }
+    return score;
+  });
 }
 
 // Search for relevant documents based on query
 export async function searchVectorStore(
   query: string,
   topK: number = 5
-): Promise<{ content: string; score: number; category: string }[]> {
-  const coll = await initializeVectorStore();
-
-  const results = await coll.query({
-    queryTexts: [query],
-    nResults: topK,
-  });
-
-  if (!results.documents || !results.documents[0]) {
-    return [];
-  }
-
-  return results.documents[0].map((doc, index) => ({
-    content: doc || '',
-    score: results.distances?.[0]?.[index] ? 1 - results.distances[0][index] : 0,
-    category: (results.metadatas?.[0]?.[index] as { category?: string })?.category || 'unknown',
-  }));
+): Promise<SearchResult[]> {
+  const documents = resumeKnowledgeBase.map(item => item.content);
+  const scores = computeTFIDF(query, documents);
+  
+  const results = resumeKnowledgeBase
+    .map((item, index) => ({
+      content: item.content,
+      score: scores[index],
+      category: item.category,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
+  
+  return results;
 }
 
 // Search by category filter
@@ -89,26 +69,24 @@ export async function searchByCategory(
   query: string,
   categories: string[],
   topK: number = 5
-): Promise<{ content: string; score: number; category: string }[]> {
-  const coll = await initializeVectorStore();
-
-  const results = await coll.query({
-    queryTexts: [query],
-    nResults: topK,
-    where: {
-      category: { $in: categories },
-    },
-  });
-
-  if (!results.documents || !results.documents[0]) {
-    return [];
-  }
-
-  return results.documents[0].map((doc, index) => ({
-    content: doc || '',
-    score: results.distances?.[0]?.[index] ? 1 - results.distances[0][index] : 0,
-    category: (results.metadatas?.[0]?.[index] as { category?: string })?.category || 'unknown',
-  }));
+): Promise<SearchResult[]> {
+  const filteredKB = resumeKnowledgeBase.filter(item => 
+    categories.includes(item.category)
+  );
+  
+  const documents = filteredKB.map(item => item.content);
+  const scores = computeTFIDF(query, documents);
+  
+  const results = filteredKB
+    .map((item, index) => ({
+      content: item.content,
+      score: scores[index],
+      category: item.category,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
+  
+  return results;
 }
 
 // Get relevant context for resume analysis using RAG
@@ -138,7 +116,7 @@ export async function getRelevantContext(resumeText: string): Promise<string> {
 
     const context = allResults.join('\n\n---\n\n');
 
-    return `## Retrieved Market Standards (from Chroma Vector DB):\n\n${context}`;
+    return `## Retrieved Market Standards:\n\n${context}`;
   } catch (error) {
     console.error('Error retrieving context from Chroma:', error);
     // Fallback to basic context

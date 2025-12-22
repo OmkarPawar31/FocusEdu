@@ -4,7 +4,6 @@ import Link from 'next/link'
 import Snowfall from 'react-snowfall'
 import Navbar from './components/Navbar'
 import HeroScene from "./components/HeroScene";
- import { Skeleton } from "@/components/ui/skeleton"
 
 const HomePage = () => {
   return (

@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Snowfall from 'react-snowfall';
-import Link from 'next/link';
 import Navbar from '@/app/components/Navbar';
 
 interface AnalysisResult {
