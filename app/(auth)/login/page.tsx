@@ -39,7 +39,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     console.log("✅ Login success:", userCredential.user);
     
-    router.push("/resume-analysis");
+    router.push("/");
     alert("Login successful!");
   } catch (error: any) {
     console.error("❌ Login error:", error);
@@ -70,7 +70,7 @@ const handleGoogleLogin = async () => {
       });
     }
 
-    router.push("/resume-analysis");
+    router.push("/");
   } catch (error: any) {
     console.error("❌ Google Login Error:", error);
     alert(error.message);

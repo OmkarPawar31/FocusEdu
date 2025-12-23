@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, X, Rocket } from 'lucide-react'
+import { Menu, X, LogOut } from 'lucide-react'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 
 const navLinks = [
   { name: 'Home', href: '/' },
@@ -13,6 +15,22 @@ const navLinks = [
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+  const [user, setUser] = useState<any>(null)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth)
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
 
   return (
     <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-white/5 backdrop-blur-md">
@@ -36,11 +54,26 @@ export default function Navbar() {
                   {link.name}
                 </Link>
               ))}
-              <Link href={"/login"}>
-              <button className="cursor-pointer bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-5 py-2 rounded-full text-sm font-semibold transition-all shadow-lg shadow-blue-500/20">
-                Login
-              </button>
-              </Link>
+              {user ? (
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-slate-300">
+                    Hi, <span className="text-violet-400 font-medium">{user.displayName || user.email?.split('@')[0]}</span>
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    className="cursor-pointer flex items-center gap-2 bg-slate-700/50 hover:bg-slate-600/50 text-white px-4 py-2 rounded-full text-sm font-medium transition-all border border-slate-600/50"
+                  >
+                    <LogOut size={16} />
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <Link href="/login">
+                  <button className="cursor-pointer bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white px-5 py-2 rounded-full text-sm font-semibold transition-all shadow-lg shadow-blue-500/20">
+                    Login
+                  </button>
+                </Link>
+              )}
             </div>
           </div>
 
@@ -70,6 +103,31 @@ export default function Navbar() {
                 {link.name}
               </Link>
             ))}
+            {user ? (
+              <div className="px-3 py-4 border-b border-white/5">
+                <p className="text-sm text-slate-300 mb-3">
+                  Hi, <span className="text-violet-400 font-medium">{user.displayName || user.email?.split('@')[0]}</span>
+                </p>
+                <button
+                  onClick={() => {
+                    handleLogout()
+                    setIsOpen(false)
+                  }}
+                  className="flex items-center gap-2 text-red-400 hover:text-red-300 text-base font-medium"
+                >
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="text-violet-400 hover:text-violet-300 block px-3 py-4 text-base font-medium"
+                onClick={() => setIsOpen(false)}
+              >
+                Login
+              </Link>
+            )}
           </div>
         </div>
       )}
