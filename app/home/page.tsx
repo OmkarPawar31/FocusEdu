@@ -1,12 +1,22 @@
 "use client";
-import React from 'react'
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link'
 import Snowfall from 'react-snowfall'
 import Navbar from "@/app/components/Navbar";
 import HeroScene from "@/app/components/HeroScene";
 
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+
 
 const HomePage = () => {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col">
       <Snowfall />
@@ -124,26 +134,28 @@ const HomePage = () => {
         </section>
 
         {/* CTA Section */}
-        <section className="max-w-7xl mx-auto px-6 py-20">
-          <div className="relative overflow-hidden bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 rounded-3xl p-10 md:p-16 text-center">
-            <div className="absolute top-0 left-0 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl -translate-y-1/2 -translate-x-1/2"></div>
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-3xl translate-y-1/2 translate-x-1/2"></div>
-            
-            <div className="relative z-10">
-              <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Learning?</h3>
-              <p className="text-slate-300 mb-8 max-w-xl mx-auto">Join thousands of learners who are already using FocusEdu to master new skills.</p>
-              <Link 
-                href="/signup" 
-                className="inline-flex items-center gap-2 px-8 py-4 text-base font-semibold bg-white text-slate-900 rounded-xl transition-all no-underline hover:bg-slate-100 hover:shadow-xl hover:-translate-y-0.5"
-              >
-                Create Free Account
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </Link>
+        {/* CTA Section: Only show if not logged in */}
+        {!user && (
+          <section className="max-w-7xl mx-auto px-6 py-20">
+            <div className="relative overflow-hidden bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 rounded-3xl p-10 md:p-16 text-center">
+              <div className="absolute top-0 left-0 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl -translate-y-1/2 -translate-x-1/2"></div>
+              <div className="absolute bottom-0 right-0 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-3xl translate-y-1/2 translate-x-1/2"></div>
+              <div className="relative z-10">
+                <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Learning?</h3>
+                <p className="text-slate-300 mb-8 max-w-xl mx-auto">Join thousands of learners who are already using FocusEdu to master new skills.</p>
+                <Link 
+                  href="/signup" 
+                  className="inline-flex items-center gap-2 px-8 py-4 text-base font-semibold bg-white text-slate-900 rounded-xl transition-all no-underline hover:bg-slate-100 hover:shadow-xl hover:-translate-y-0.5"
+                >
+                  Create Free Account
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </Link>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
 
       {/* Footer */}
